@@ -1,0 +1,4 @@
+# ROOT DIRECTORY FOR SVN REPOSITORY
+SVN_ROOT = '~/workarea/eloqua/SC.UI'
+# ROOT DIRECTORY FOR GIT REPOSITORY
+GIT_ROOT = '~/workarea/eloqua/orion'
