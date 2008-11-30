@@ -1,0 +1,24 @@
+=== Welcome to the Git2svn Conversion Tool:
+
+The purpose of this tool is to slave a user defined SVN repository to a git repository so that one can track changes in a SVN repository.  This is different from git-svn because that allows you to generate a GIT repository from an svn repository.
+
+Git2svn allows you to start with a Git repository and then later link it to a independent subversion repository and have it track the changes.  For this version, you need to have an subversion repository already created in an independent directory
+
+This is an early version so it doesn't have all the bells and whistles that we want it to have. The current use is:
+
+1.  Change the SVN_ROOT to the full path to the subversion repository that you have created
+2.  Change the GIT_ROOT to the full path of the git repository that you want to map to the SVN repository
+3.  Change\Add to the SVN_DIR_EXCLUDE with comma separated list of directories that you want git2svn to ignore in svn
+    Default: ".svn"
+4.  Change\Add to the GIT_DIR_EXCLUDE with comma separated list of directories that you want git2svn to ignore in git
+    Default: ".git, public, log"
+5.  Run the script with 'ruby git2svn.rb'
+
+GOTCHAS:
+  - This is a READ ONLY slave.  Any independent changes to the svn repository will be over written by the tool.
+  
+FUTURE DEVELOPMENT:
+  - Add a configuration file to save the state of the script
+  - Add the ability to do a fresh pull of the svn or create a new svn repository to a local temp directory
+  - Add commandline action to do stuff
+  - Add the ability to pull the latest commit message from git to make it the message for the svn commit
