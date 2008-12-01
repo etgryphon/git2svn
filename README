@@ -22,3 +22,5 @@ FUTURE DEVELOPMENT:
   - Add the ability to do a fresh pull of the svn or create a new svn repository to a local temp directory
   - Add commandline action to do stuff
   - Add the ability to pull the latest commit message from git to make it the message for the svn commit
+  
+Git2svn is under the MIT license
