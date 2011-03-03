@@ -9,12 +9,19 @@
 #
 #
 # == Usage 
+# (1) ./git2svn <path to git dir or file> <svn repo address> [--file=name] [--ignore=ignore list comma seperated] [--save=name] [--msg="svn message"]
+#     Examples: 
+#       => ./git2svn ~/gitrepos/myrepo/ http://my.svn.repo/directory/
+#       => ./git2svn ~/gitrepos/myrepo/ http://my.svn.repo/directory/ --message="my message" --ignore==.svn,.git,public,log
+#       => ./git2svn ~/gitrepos/myrepo/myfile http://my.svn.repo/directory/ --file=myfile --msg="my message" --ignore==.svn,.git,public,log
+#       => ./git2svn ~/gitrepos/myrepo/myfile http://my.svn.repo/directory/ --file=myfile --msg="my message" --ignore==.svn,.git,public,log --save=standard
+# (2) ./git2svn --use=<name> [--message="svn message"]
 #
 # == Author
 # Evin Grano, Mike Ball
 #
 # == Copyright
-#   Copyright (c) 2008 Evin Grano, Mike Ball. All Rights Rserved.
+#   Copyright (c) 2008-2011 Evin Grano, Mike Ball. All Rights Rserved.
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -35,45 +42,106 @@
 # THE SOFTWARE.
 
 require 'find'
-require 'ftools'
 require 'fileutils'
+require 'digest/sha1'
+# ***********************************************************
+# Usages:
+# 
+
 class Git2Svn
 
   def initialize(arguments, stdin)
-      #init stuff....
-      # TODO:  Check for the configuration file to grab the SVN_ROOT Directory
+    @valid_args = [:file, :ignore, :msg, :save, :use]
+    # Check to make sure this has the minimum
+    if arguments.length < 2
+      puts "ERROR: Must have at least a 2 arguments and you have #{arguments.length}" 
+      return 
+    end
+    @config = {:valid_config => false, :ignore => '.svn,.git,public,log,tmp,temp'}
+    # grab the GIT path
+    @config[:git_path] = arguments.shift
+    return unless validate_git_path(@config[:git_path])
+    # grab svn path
+    @config[:svn_repo] = arguments.shift
+    return unless validate_svn(@config[:svn_repo])
+    # get all the arguments off
+    arguments.each{ |x| parse_argument(x) }
+    @config[:valid_config] = true
+  end
+  
+  def validate_git_path(path)
+    if File.file?(path)
+      puts "#{path} => is a File"
+      @config[:is_file] = true
+      return true
+    elsif File.directory?(path) 
+      puts "#{path} => is a Directory"
+      @config[:is_dir] = true
+      return true
+    else
+      puts "ERROR: git path is NOT a directory or file that exists..."
+      return false
+    end
+  end
+  
+  def validate_svn(path)
+    # TODO: [EG] validate that this is a valid svn address
+    return true
+  end
+  
+  def parse_argument(arg)
+    parg = arg.split('=')
+    if (parg && parg.length == 2)
+      type = parg[0][2..-1].to_sym
+      if @valid_args.include?(type)
+        val = @config[type] ? @config[type] + parg[1] : parg[1]
+        @config[type] = val
+      else
+        puts "WARN: ignoring argument [#{arg}] because it is invalid"
+      end
+    else
+      puts "bad argument"
+    end
   end
   
   def run
+    return unless @config[:valid_config]
     
     # TODO: Create a temp SVN Directory to checkout the latest copy of the SVN repository
+    FileUtils.mkdir_p "./.tmp_g2s/"
     
     # Change to the SVN Root directory and get the latest to correct collisions
-    Dir.chdir(SVN_ROOT)
-    `svn update`
+    sha1 = Digest::SHA1.hexdigest("x#{@config[:git_path]}+#{@config[:svn_repo]}]")
+    Dir.chdir('./.tmp_g2s')
+    svn_path = "./#{sha1}"
+    if (File.directory?(svn_path))
+      Dir.chdir(svn_path)
+      puts "UPDATING: svn repo #{@config[:svn_repo]}..."
+      `svn update`
+    else
+      puts "CREATE: new tmp svn repo #{@config[:svn_repo]}..."
+      `svn co #{@config[:svn_repo]} #{sha1}`
+    end
+    puts "... FINISHED!"
     
-    puts 'Started the SVN Directory Traverse and delete';
-    svn_excludes = SVN_DIR_EXCLUDE.split(',')
-    search_and_destroy(SVN_ROOT, svn_excludes)
-  
-    # Copy all files from GIT to SVN
-    git_excludes = GIT_DIR_EXCLUDE.split(',')
-    traverse_and_copy(GIT_ROOT, SVN_ROOT, git_excludes) 
     
-    # Calibrate the SVN repo to the new changes
-    # TODO:  Add the ability to grab the latest commit message from GIT
-    svn_calibration("New Stuff")
+    puts 'Search and Destroy';
+    excludes = @config[:ignore].split(',').uniq
+    search_and_destroy(svn_path, excludes)
+    #   
+    # # Copy all files from GIT to SVN
+    # git_excludes = GIT_DIR_EXCLUDE.split(',')
+    # traverse_and_copy(GIT_ROOT, SVN_ROOT, git_excludes) 
+    # 
+    # # Calibrate the SVN repo to the new changes
+    # # TODO:  Add the ability to grab the latest commit message from GIT
+    # svn_calibration("New Stuff")
     
   end
   
-  protected
-  # CONSTANTS
-  SVN_ROOT = '/path/to/svn/repository'
-  SVN_DIR_EXCLUDE = '.svn'
-  GIT_ROOT = '/path/to/git/repository'
-  GIT_DIR_EXCLUDE = '.git,public,log'
-   
+  protected   
   def search_and_destroy(src_path, exclude_dirs)
+    puts "I am here: #{FileUtils.pwd}"
     puts 'Start In: ' + src_path
     Find.find(src_path) do |entry|
       if File.file?(entry)
@@ -139,5 +207,3 @@ class Git2Svn
   end
   
 end
-app = Git2Svn.new(ARGV,STDIN)
-app.run
