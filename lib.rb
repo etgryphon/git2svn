@@ -57,7 +57,7 @@ class Git2Svn
       puts "ERROR: Must have at least a 2 arguments and you have #{arguments.length}" 
       return 
     end
-    @config = {:valid_config => false, :ignore => '.svn,.git,public,log,tmp,temp', :msg => 'New Stuff'}
+    @config = {:valid_config => false, :ignore => '.svn,.git,public,log,tmp,temp,.gitignore', :msg => 'New Stuff'}
     # grab the GIT path
     @config[:git_path] = arguments.shift
     return unless validate_git_path(@config[:git_path])
@@ -118,61 +118,78 @@ class Git2Svn
       Dir.chdir(svn_path)
       puts "UPDATING: svn repo #{@config[:svn_repo]}..."
       `svn update`
+      Dir.chdir('../..')
     else
       puts "CREATE: new tmp svn repo #{@config[:svn_repo]}..."
       `svn co #{@config[:svn_repo]} #{sha1}`
+       Dir.chdir('..')
     end
     puts "... FINISHED!"
     
     
     puts 'Search and Destroy';
     excludes = @config[:ignore].split(',').uniq
-    puts "testing: #{excludes}"
-    search_and_destroy(svn_path+'/', excludes)
-    #   
-    # # Copy all files from GIT to SVN
-    # traverse_and_copy(@config[:git_path], svn_path+'/', excludes) 
-    # 
-    # # Calibrate the SVN repo to the new changes
-    # # TODO:  Add the ability to grab the latest commit message from GIT
-    # svn_calibration(@config[:msg])
+    svn_path = "./.tmp_g2s/#{sha1}/"
+    search_and_destroy(svn_path, excludes)
+      
+    # Copy all files from GIT to SVN
+    traverse_and_copy(@config[:git_path], svn_path, excludes) 
+    
+    # Calibrate the SVN repo to the new changes
+    # TODO:  Add the ability to grab the latest commit message from GIT
+    svn_calibration(@config[:msg])
     
   end
   
   protected   
-  def search_and_destroy(src_path, exclude_dirs)
-    puts "I am here: #{FileUtils.pwd}"
-    puts 'Start In: ' + src_path
-    Find.find(src_path) do |entry|
+  def search_and_destroy(svn_path, excludes)
+    Find.find(svn_path) do |entry|
+      file_path = File.basename(entry)
       if File.file?(entry)
-        File.delete(entry)
+        File.delete(entry) unless excludes.include?(file_path)
       elsif File.directory?(entry)
-        exclude_dirs.each do |x|
-          Find.prune if (File.basename(entry) == x.strip)
+        remove = entry != svn_path ? true : false
+        excludes.each do |x|
+          if (file_path == x.strip)
+            Find.prune 
+            remove = false
+          end
         end
+        FileUtils.remove_dir(entry) if remove
       else
         puts 'Error'
       end
     end
   end
   
-  def traverse_and_copy(src_path, target_path, exclude_dirs)
+  def traverse_and_copy(src_path, target_path, excludes)
     puts 'Start In: ' + src_path
+    ex_src_path = File.expand_path(src_path)
+    ex_target_path = File.expand_path(target_path)
     Find.find(src_path) do |entry|
       # Trim base directory from the current file or directory 
-      file_path = File.expand_path(entry)
-      file_path.gsub!(src_path, '')
+      rel_path = File.expand_path(entry)
+      rel_path.gsub!(ex_src_path, '')
+      target_entry_path = "#{ex_target_path}#{rel_path}"
+      target_entry_path.gsub!('//', '/')
+      basename = File.basename(entry)
       if File.file?(entry)
-        File.copy("#{src_path}#{file_path}","#{target_path}#{file_path}")
+        FileUtils.cp(entry,target_entry_path) unless excludes.include?(basename)
       elsif File.directory?(entry)
-        exclude_dirs.each do |x|
-          Find.prune if (File.basename(entry) == x.strip)
+        should_copy = entry != ex_src_path ? true : false
+        excludes.each do |x|
+          if (basename == x.strip)
+            Find.prune 
+            should_copy = false
+          end
         end
-        # check to see if it is located in the target_path
-        target_dir_path = "#{target_path}#{file_path}"
-        if not File.directory?(target_dir_path)
-          puts "Making Directory: #{target_dir_path}"
-          FileUtils.mkdir_p(target_dir_path)
+        
+        #check to see if this is something that should be copied
+        if (should_copy)
+          if not File.directory?(target_entry_path)
+            puts "Making Directory: #{target_entry_path}"
+            FileUtils.mkdir_p(target_entry_path)
+          end
         end
       else
         puts 'Error'
