@@ -57,7 +57,7 @@ class Git2Svn
       puts "ERROR: Must have at least a 2 arguments and you have #{arguments.length}" 
       return 
     end
-    @config = {:valid_config => false, :ignore => '.svn,.git,public,log,tmp,temp'}
+    @config = {:valid_config => false, :ignore => '.svn,.git,public,log,tmp,temp', :msg => 'New Stuff'}
     # grab the GIT path
     @config[:git_path] = arguments.shift
     return unless validate_git_path(@config[:git_path])
@@ -127,15 +127,15 @@ class Git2Svn
     
     puts 'Search and Destroy';
     excludes = @config[:ignore].split(',').uniq
-    search_and_destroy(svn_path, excludes)
+    puts "testing: #{excludes}"
+    search_and_destroy(svn_path+'/', excludes)
     #   
     # # Copy all files from GIT to SVN
-    # git_excludes = GIT_DIR_EXCLUDE.split(',')
-    # traverse_and_copy(GIT_ROOT, SVN_ROOT, git_excludes) 
+    # traverse_and_copy(@config[:git_path], svn_path+'/', excludes) 
     # 
     # # Calibrate the SVN repo to the new changes
     # # TODO:  Add the ability to grab the latest commit message from GIT
-    # svn_calibration("New Stuff")
+    # svn_calibration(@config[:msg])
     
   end
   
