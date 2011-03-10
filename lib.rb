@@ -57,7 +57,7 @@ class Git2Svn
       puts "ERROR: Must have at least a 2 arguments and you have #{arguments.length}" 
       return 
     end
-    @config = {:valid_config => false, :ignore => '.svn,.git,public,log,tmp,temp,.gitignore', :msg => 'New Stuff'}
+    @config = {:valid_config => false, :ignore => '.svn,.git,public,log,tmp,temp,.gitignore'}
     # grab the GIT path
     @config[:git_path] = arguments.shift
     return unless validate_git_path(@config[:git_path])
@@ -134,7 +134,7 @@ class Git2Svn
     puts "UPDATING: svn repo #{@config[:svn_repo]} w/ #{@config[:file]}..."
     `svn update #{@config[:file]}`
     target_file = File.expand_path("./#{@config[:file]}")
-    File.delete(@config[:file])
+    File.delete(target_file) if File.file?(target_file)
     FileUtils.cp(expanded_file, target_file)
     svn_calibration(@config[:msg])
   end
@@ -235,6 +235,7 @@ class Git2Svn
     puts "COMMITTING: #{@changes[:deletions]} DELETIONS and #{@changes[:additions]} ADDITIONS to [#{@config[:svn_repo]}]"
     `svn commit -m 'READ ONLY: #{message}'`
     puts "... FINISHED!"
+    Dir.chdir('../..')
   end
   
   def process_status_line(line)
