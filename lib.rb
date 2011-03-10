@@ -76,7 +76,7 @@ class Git2Svn
       return true
     elsif File.directory?(path) 
       puts "#{path} => is a Directory"
-      @config[:is_dir] = true
+      @config[:is_file] = false
       return true
     else
       puts "ERROR: git path is NOT a directory or file that exists..."
@@ -109,9 +109,39 @@ class Git2Svn
     
     # TODO: Create a temp SVN Directory to checkout the latest copy of the SVN repository
     FileUtils.mkdir_p "./.tmp_g2s/"
+    if (@config[:is_file])
+      process_as_file()
+    else
+      process_as_dir()
+    end
+  end
+  
+  protected   
+  def process_as_file
+    sha1 = Digest::SHA1.hexdigest("file-#{@config[:git_path]}+#{@config[:svn_repo]}]")
+    expanded_file = File.expand_path(@config[:git_path])
+    Dir.chdir('./.tmp_g2s')
+    svn_path = "./#{sha1}"
+    if (File.directory?(svn_path))
+      Dir.chdir(svn_path)
+    else
+      puts "CREATE: new tmp svn repo #{@config[:svn_repo]}..."
+      `svn co #{@config[:svn_repo]} #{sha1} --depth empty`
+      Dir.chdir(sha1)
+    end
+    puts "... FINISHED!"
     
+    puts "UPDATING: svn repo #{@config[:svn_repo]} w/ #{@config[:file]}..."
+    `svn update #{@config[:file]}`
+    target_file = File.expand_path("./#{@config[:file]}")
+    File.delete(@config[:file])
+    FileUtils.cp(expanded_file, target_file)
+    svn_calibration(@config[:msg])
+  end
+  
+  def process_as_dir
     # Change to the SVN Root directory and get the latest to correct collisions
-    sha1 = Digest::SHA1.hexdigest("x#{@config[:git_path]}+#{@config[:svn_repo]}]")
+    sha1 = Digest::SHA1.hexdigest("dir-#{@config[:git_path]}+#{@config[:svn_repo]}]")
     Dir.chdir('./.tmp_g2s')
     svn_path = "./#{sha1}"
     if (File.directory?(svn_path))
@@ -141,7 +171,6 @@ class Git2Svn
     svn_calibration(@config[:msg])
   end
   
-  protected   
   def search_and_destroy(svn_path, excludes)
     Find.find(svn_path) do |entry|
       file_path = File.basename(entry)
